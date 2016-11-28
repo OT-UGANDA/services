@@ -1,5 +1,6 @@
 package org.sola.cs.services.ejbs.claim.entities;
 
+import java.math.BigInteger;
 import javax.persistence.Column;
 import org.sola.services.common.repository.entities.AbstractReadOnlyEntity;
 
@@ -14,7 +15,7 @@ public class ClaimSpatial extends AbstractReadOnlyEntity {
             + "  select st_astext(st_buffer(mapped_geometry, 0.0001)) as geom "
             + "  from opentenure.claim where id =#{ " + PARAM_CLAIM_ID + "} and mapped_geometry is not null "
             + ") "
-            + "select id, nr, status_code, "
+            + "select id, nr, status_code, claim_area, "
             + "st_astext(case when coalesce(#{ " + PARAM_CUSTOM_SRID + "},0) = 0 then mapped_geometry else st_transform(st_setsrid(mapped_geometry,4326),#{ " + PARAM_CUSTOM_SRID + "}) end) as geom, "
             + "(case when id =#{ " + PARAM_CLAIM_ID + "} then true else false end) as target "
             + "from opentenure.claim "
@@ -26,6 +27,8 @@ public class ClaimSpatial extends AbstractReadOnlyEntity {
     private String nr;
     @Column(name = "status_code")
     private String statusCode;
+    @Column(name="claim_area")
+    private long claimArea;
     @Column
     private boolean target;
     @Column
@@ -48,6 +51,14 @@ public class ClaimSpatial extends AbstractReadOnlyEntity {
 
     public void setNr(String nr) {
         this.nr = nr;
+    }
+
+    public long getClaimArea() {
+        return claimArea;
+    }
+
+    public void setClaimArea(long claimArea) {
+        this.claimArea = claimArea;
     }
 
     public String getStatusCode() {

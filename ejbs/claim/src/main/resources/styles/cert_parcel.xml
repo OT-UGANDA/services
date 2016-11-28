@@ -15,30 +15,9 @@
                         </PropertyIsEqualTo>
                     </Filter>
                     <PolygonSymbolizer>
-                        <Fill>
-                            <GraphicFill>
-                                <Graphic>
-                                    <Mark>
-                                        <WellKnownName>shape://slash</WellKnownName>
-                                        <Fill/>
-                                        <Stroke>
-                                            <CssParameter name="stroke">#aaaaaa</CssParameter>
-                                            <CssParameter name="stroke-width">1.0</CssParameter>
-                                        </Stroke>
-                                    </Mark>
-                                    <Size>
-                                        <ogc:Literal>8.0</ogc:Literal>
-                                    </Size>
-                                </Graphic>
-                            </GraphicFill>
-                            <!--
-                            <sld:CssParameter name="fill">#7CE3F8</sld:CssParameter>
-                            <sld:CssParameter name="fill-opacity">0.5</sld:CssParameter>
-                            -->
-                        </Fill>
                         <Stroke>
-                            <CssParameter name="stroke">#FF0000</CssParameter>
-                            <CssParameter name="stroke-width">3</CssParameter>
+                            <CssParameter name="stroke">#000000</CssParameter>
+                            <CssParameter name="stroke-width">2</CssParameter>
                         </Stroke>
                     </PolygonSymbolizer>
                     <!--
@@ -82,7 +61,7 @@
                     <PolygonSymbolizer>
                         <Stroke>
                             <CssParameter name="stroke">#000000</CssParameter>
-                            <CssParameter name="stroke-width">2</CssParameter>
+                            <CssParameter name="stroke-width">1</CssParameter>
                         </Stroke>
                     </PolygonSymbolizer>
                     <TextSymbolizer>

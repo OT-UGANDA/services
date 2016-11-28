@@ -1,5 +1,8 @@
 package org.sola.cs.services.ejbs.claim.businesslogic;
 
+import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Envelope;
+import com.vividsolutions.jts.geom.LineString;
 import com.vividsolutions.jts.geom.Polygon;
 import com.vividsolutions.jts.io.ParseException;
 import java.awt.BasicStroke;
@@ -13,8 +16,8 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.NoninvertibleTransformException;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.URL;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -33,6 +36,7 @@ import org.geotools.feature.DefaultFeatureCollection;
 import org.geotools.feature.SchemaException;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
+import org.geotools.geometry.jts.JTS;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.geometry.jts.WKTReader2;
 import org.geotools.map.FeatureLayer;
@@ -42,11 +46,13 @@ import org.geotools.referencing.CRS;
 import org.geotools.styling.SLDParser;
 import org.geotools.styling.Style;
 import org.geotools.styling.StyleFactory;
+import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.TransformException;
 import org.sola.common.ConfigConstants;
+import org.sola.common.NumberUtility;
 import org.sola.common.SOLAException;
 import org.sola.cs.common.messaging.ServiceMessage;
 import org.sola.cs.services.ejb.system.businesslogic.SystemCSEJBLocal;
@@ -117,8 +123,13 @@ public class MapImageEJB extends AbstractEJB implements MapImageEJBLocal {
             }
 
             SimpleFeatureTypeBuilder builder = new SimpleFeatureTypeBuilder();
+            SimpleFeatureTypeBuilder builderDimension = new SimpleFeatureTypeBuilder();
+
             builder.setName("parcel");
             builder.setCRS(crs);
+
+            builderDimension.setName("dimension");
+            builderDimension.setCRS(crs);
             //builder.setCRS(CRS.decode("EPSG:" + crs));
 
             // add attributes in order
@@ -126,11 +137,18 @@ public class MapImageEJB extends AbstractEJB implements MapImageEJBLocal {
             builder.length(25).add("label", String.class);
             builder.add("target", Boolean.class);
 
+            builderDimension.add("geom", LineString.class);
+            builderDimension.length(25).add("label", String.class);
+
             // build the type
             final SimpleFeatureType TYPE = builder.buildFeatureType();
+            final SimpleFeatureType TYPE_DIMENTION = builderDimension.buildFeatureType();
 
             DefaultFeatureCollection claimFeatures = new DefaultFeatureCollection("parcels", TYPE);
+            DefaultFeatureCollection claimDimentions = new DefaultFeatureCollection("dimensions", TYPE_DIMENTION);
+
             WKTReader2 wkt = new WKTReader2();
+            SimpleFeature mainClaim = null;
 
             // Get parcels
             List<ClaimSpatial> claims = getSpatialClaimsByClaim(claimId, customCrsInt);
@@ -140,11 +158,35 @@ public class MapImageEJB extends AbstractEJB implements MapImageEJBLocal {
             }
 
             for (ClaimSpatial claim : claims) {
-                claimFeatures.add(SimpleFeatureBuilder.build(TYPE, new Object[]{
-                    wkt.read(claim.getGeom()), claim.getNr(), claim.isTarget()}, claim.getId()));
-            }
+                String claimLabel = claim.getNr();
 
-            SimpleFeatureSource parcelsSource = DataUtilities.source(claimFeatures);
+                if (claim.isTarget()) {
+                    if (claim.getClaimArea() >= 10000) {
+                        claimLabel = Double.toString(NumberUtility.roundDouble((double) claim.getClaimArea() / 10000, 4)) + "ha";
+                    } else {
+                        claimLabel = Long.toString(claim.getClaimArea()) + "m2";
+                    }
+                }
+
+                SimpleFeature claimFeature = SimpleFeatureBuilder.build(TYPE, new Object[]{
+                    wkt.read(claim.getGeom()), claimLabel, claim.isTarget()}, claim.getId());
+                claimFeatures.add(claimFeature);
+
+                if (claim.isTarget()) {
+                    mainClaim = claimFeature;
+                    Coordinate[] points = ((Polygon) claimFeature.getDefaultGeometry()).getCoordinates();
+                    for (int i = 0; i < points.length - 1; i++) {
+                        claimDimentions.add(SimpleFeatureBuilder.build(
+                                TYPE_DIMENTION,
+                                new Object[]{
+                                    wkt.read(String.format("LINESTRING(%s %s,%s %s)", points[i].x, points[i].y, points[i + 1].x, points[i + 1].y)),
+                                    Double.toString(NumberUtility.roundDouble(calcDistance(points[i], points[i + 1], crs), 2)) + "m"
+                                },
+                                Integer.toString(i)
+                        ));
+                    }
+                }
+            }
 
             // Create a map content and add our shapefile to it
             MapContent map = new MapContent();
@@ -153,31 +195,49 @@ public class MapImageEJB extends AbstractEJB implements MapImageEJBLocal {
             map.getViewport().setCoordinateReferenceSystem(crs);
 
             StyleFactory styleFactory = CommonFactoryFinder.getStyleFactory();
-            URL sldURL = MapImageEJB.class.getResource(resourcesPath + "cert_parcel.xml");
             SLDParser stylereader;
+            URL sldURL;
+
+            // Add dementions layer first
+            sldURL = MapImageEJB.class.getResource(resourcesPath + "target_parcel_sides.xml");
+            stylereader = new SLDParser(styleFactory, sldURL);
+            Style sldDimentionStyle = stylereader.readXML()[0];
+
+            Layer dimentionLayer = new FeatureLayer(DataUtilities.source(claimDimentions), sldDimentionStyle);
+            map.addLayer(dimentionLayer);
+
+            // Add parcels layer
+            sldURL = MapImageEJB.class.getResource(resourcesPath + "cert_parcel.xml");
             stylereader = new SLDParser(styleFactory, sldURL);
             Style sldStyle = stylereader.readXML()[0];
 
-            Layer layer = new FeatureLayer(parcelsSource, sldStyle);
+            Layer layer = new FeatureLayer(DataUtilities.source(claimFeatures), sldStyle);
             map.addLayer(layer);
+
+            // Set map zoom to the main parcel size + 20%
+            Envelope env = ((Polygon) mainClaim.getDefaultGeometry()).getEnvelopeInternal();
+            double percent = 0.2;
+            double deltaX = (env.getMaxX() - env.getMinX()) * percent;
+            double deltaY = (env.getMaxY() - env.getMinY()) * percent;
 
             // Make map extent with the same ratio as requested image 
             double imageRatio = (double) height / (double) width;
             double mapRatio = map.getMaxBounds().getHeight() / map.getMaxBounds().getWidth();
-            double minX = map.getMaxBounds().getMinX();
-            double maxX = map.getMaxBounds().getMaxX();
-            double minY = map.getMaxBounds().getMinY();
-            double maxY = map.getMaxBounds().getMaxY();
+            double minX = env.getMinX() - deltaX;
+            double maxX = env.getMaxX() + deltaX;
+            double minY = env.getMinY() - deltaY;
+            double maxY = env.getMaxY() + deltaY;
 
+           
             if (imageRatio != mapRatio) {
                 if (imageRatio < mapRatio) {
-                    double newMapWidth = map.getMaxBounds().getHeight() / imageRatio;
-                    minX = map.getMaxBounds().getMedian(0) - newMapWidth / 2;
-                    maxX = map.getMaxBounds().getMedian(0) + newMapWidth / 2;
+                    double newMapWidth = env.getHeight() / imageRatio;
+                    minX = minX - newMapWidth / 2;
+                    maxX = maxX + newMapWidth / 2;
                 } else {
-                    double newMapHeight = map.getMaxBounds().getWidth() * imageRatio;
-                    minY = map.getMaxBounds().getMedian(1) - newMapHeight / 2;
-                    maxY = map.getMaxBounds().getMedian(1) + newMapHeight / 2;
+                    double newMapHeight = env.getWidth() * imageRatio;
+                    minY = minY - newMapHeight / 2;
+                    maxY = maxY + newMapHeight / 2;
                 }
             }
 
@@ -192,6 +252,22 @@ public class MapImageEJB extends AbstractEJB implements MapImageEJBLocal {
         } catch (Exception e) {
             LogUtility.log("Failed to create map", e);
             throw new SOLAException(ServiceMessage.OT_WS_CLAIM_FAILED_TO_CREATE_MAP);
+        }
+    }
+
+    private double calcDistance(Coordinate coord1, Coordinate coord2, CoordinateReferenceSystem crs) {
+        if (isWgs84(crs)) {
+            double earthRadius = 6371000; //meters
+            double dLat = Math.toRadians(coord2.x - coord1.x);
+            double dLng = Math.toRadians(coord2.y - coord1.y);
+            double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                    + Math.cos(Math.toRadians(coord1.x)) * Math.cos(Math.toRadians(coord2.x))
+                    * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            float dist = (float) (earthRadius * c);
+            return dist;
+        } else {
+            return Math.sqrt(Math.pow(coord2.x - coord1.x, 2) + Math.pow(coord2.y - coord1.y, 2));
         }
     }
 
@@ -353,7 +429,7 @@ public class MapImageEJB extends AbstractEJB implements MapImageEJBLocal {
         int gridSize = getBestGridSize(width, height, mpp);
         int stepSize = (int) Math.round(gridSize / mpp);
         int cutLen = 8;
-        grFullImage.setColor(Color.RED);
+        grFullImage.setColor(new Color(200, 200, 200));
         grFullImage.setStroke(new BasicStroke(1));
         AffineTransform tr = map.getViewport().getScreenToWorld();
 
