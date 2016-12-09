@@ -1,13 +1,13 @@
 package org.sola.cs.services.ejbs.claim.businesslogic;
 
-import java.awt.image.BufferedImage;
 import java.util.List;
 import javax.ejb.Local;
+import org.sola.cs.services.ejb.refdata.entities.SourceType;
+import org.sola.cs.services.ejbs.claim.entities.Attachment;
 import org.sola.cs.services.ejbs.claim.entities.AttachmentBinary;
 import org.sola.cs.services.ejbs.claim.entities.AttachmentChunk;
 import org.sola.cs.services.ejbs.claim.entities.Claim;
 import org.sola.cs.services.ejbs.claim.entities.ClaimPermissions;
-import org.sola.cs.services.ejbs.claim.entities.ClaimSpatial;
 import org.sola.cs.services.ejbs.claim.entities.ClaimStatus;
 import org.sola.cs.services.ejbs.claim.entities.FieldConstraintType;
 import org.sola.cs.services.ejbs.claim.entities.FieldType;
@@ -58,7 +58,10 @@ public interface ClaimEJBLocal extends AbstractEJBLocal {
     boolean canChallengeClaim(String claimId);
     boolean canRevertClaimReview(String claimId);
     boolean submitClaim(String claimId, String languageCode);
+    boolean canPrintClaimCertificate(String claimId, String languageCode);
+    boolean canIssueClaim(String id);
     void addClaimAttachment(String claimId, String attachmentId);
+    Attachment saveClaimAttachment(Attachment attachment, String languageCode);
     ClaimPermissions getClaimPermissions(String claimId);
     List<FormTemplate> getFormTemplates(String languageCode);
     FormTemplate getFormTemplate(String templateName, String languageCode);
@@ -67,4 +70,6 @@ public interface ClaimEJBLocal extends AbstractEJBLocal {
     List<FieldValueType> getFieldValueTypes(String languageCode);
     List<FieldConstraintType> getFieldConstraintTypes(String languageCode);
     boolean checkFormTemplateHasPayload(String formName);
+    boolean issueClaim(String claimId, String langaugeCode);
+    List<SourceType> getDocumentTypesForIssuance(String langaugeCode);
 }

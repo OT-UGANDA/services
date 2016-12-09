@@ -31,6 +31,9 @@ public class ClaimStatusChanger extends AbstractEntity {
     @Column(name = "rejection_reason_code")
     private String rejectionReasonCode;
 
+    @Column(name="issuance_date")
+    private Date issuanceDate;
+    
     public ClaimStatusChanger() {
         super();
     }
@@ -89,5 +92,13 @@ public class ClaimStatusChanger extends AbstractEntity {
 
     public void setChallengeExpiryDate(Date challengeExpiryDate) {
         this.challengeExpiryDate = challengeExpiryDate;
+    }
+
+    public Date getIssuanceDate() {
+        return issuanceDate;
+    }
+
+    public void setIssuanceDate(Date issuanceDate) {
+        this.issuanceDate = issuanceDate;
     }
 }

@@ -53,6 +53,11 @@
             <artifactId>sola-cs-admin</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>sola-cs-refdata</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
     
     <repositories>

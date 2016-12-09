@@ -16,8 +16,26 @@ public class ClaimPermissions {
     boolean canSubmitClaim = false;
     boolean canChallengeClaim = false;
     boolean canRevert = false;
+    boolean canPrintCertificate = false;
+    boolean canIssue = false;
     
     public ClaimPermissions(){
+    }
+
+    public boolean isCanIssue() {
+        return canIssue;
+    }
+
+    public void setCanIssue(boolean canIssue) {
+        this.canIssue = canIssue;
+    }
+
+    public boolean isCanPrintCertificate() {
+        return canPrintCertificate;
+    }
+
+    public void setCanPrintCertificate(boolean canPrintCertificate) {
+        this.canPrintCertificate = canPrintCertificate;
     }
 
     public boolean isCanSubmitClaim() {

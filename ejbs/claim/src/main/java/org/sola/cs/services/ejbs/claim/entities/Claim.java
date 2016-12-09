@@ -85,6 +85,8 @@ public class Claim extends AbstractVersionedEntity {
     private int version;
     @Column(name="claim_area")
     private Long claimArea;
+    @Column(name="issuance_date")
+    private Date issuanceDate;
     
     public static final String PARAM_CHALLENGED_ID = "challengeId";
     public static final String PARAM_CLAIM_NUMBER = "claimNumber";
@@ -344,6 +346,14 @@ public class Claim extends AbstractVersionedEntity {
 
     public void setClaimArea(Long claimArea) {
         this.claimArea = claimArea;
+    }
+
+    public Date getIssuanceDate() {
+        return issuanceDate;
+    }
+
+    public void setIssuanceDate(Date issuanceDate) {
+        this.issuanceDate = issuanceDate;
     }
     
     public boolean getIsReadyForReview(){

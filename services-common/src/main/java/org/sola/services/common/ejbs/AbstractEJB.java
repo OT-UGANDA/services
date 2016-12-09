@@ -94,6 +94,7 @@ import org.sola.services.common.repository.entities.AbstractEntity;
     RolesConstants.CS_RECORD_CLAIM,
     RolesConstants.CS_REVIEW_CLAIM,
     RolesConstants.CS_VIEW_REPORTS,
+    RolesConstants.CS_PRINT_CERTIFICATE,
     RolesConstants.CLASSIFICATION_CHANGE_CLASS,
     RolesConstants.CLASSIFICATION_UNRESTRICTED,
     RolesConstants.CLASSIFICATION_RESTRICTED,
