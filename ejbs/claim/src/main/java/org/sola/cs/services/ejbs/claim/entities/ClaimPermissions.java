@@ -18,6 +18,7 @@ public class ClaimPermissions {
     boolean canRevert = false;
     boolean canPrintCertificate = false;
     boolean canIssue = false;
+    boolean canTransfer = false;
     
     public ClaimPermissions(){
     }
@@ -132,5 +133,13 @@ public class ClaimPermissions {
 
     public void setCanRevert(boolean canRevert) {
         this.canRevert = canRevert;
+    }
+    
+    public boolean isCanTransfer() {
+        return canTransfer;
+    }
+    
+    public void setCanTransfer(boolean canTransfer) {
+        this.canTransfer = canTransfer;
     }
 }

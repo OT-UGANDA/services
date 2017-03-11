@@ -150,6 +150,39 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
 
     @Override
     @RolesAllowed({RolesConstants.CS_RECORD_CLAIM, RolesConstants.CS_REVIEW_CLAIM, RolesConstants.CS_MODERATE_CLAIM})
+    public Claim transferClaim(Claim claim, String languageCode) {
+        if (claim == null) {
+            throw new SOLAException(ServiceMessage.GENERAL_OBJECT_IS_NULL);
+        }
+        claim.setVersion(claim.getVersion() + 1);
+        Date currentTime = Calendar.getInstance().getTime();
+        String userName = getUserName();
+        
+        // Set share registration and termination date
+        if(claim.getShares() != null){
+            for(ClaimShare share : claim.getShares()){
+                // Assign user name if empty
+                if(share.getOwners() != null){
+                    for(ClaimParty party : share.getOwners()){
+                        if(StringUtility.isEmpty(party.getUserName())){
+                            party.setUserName(userName);
+                        }
+                    }
+                }
+                
+                if(StringUtility.empty(share.getStatus()).equalsIgnoreCase(ClaimShare.STATUS_HISTORIC) && share.getTerminationDate() == null)
+                    share.setTerminationDate(currentTime);
+                if((StringUtility.isEmpty(share.getStatus())  
+                        || StringUtility.empty(share.getStatus()).equalsIgnoreCase(ClaimShare.STATUS_ACTIVE))
+                        && share.getRegistrationDate()== null)
+                    share.setRegistrationDate(currentTime);
+            }
+        }
+        return getRepository().saveEntity(claim);
+    }
+    
+    @Override
+    @RolesAllowed({RolesConstants.CS_RECORD_CLAIM, RolesConstants.CS_REVIEW_CLAIM, RolesConstants.CS_MODERATE_CLAIM})
     public Claim saveClaim(Claim claim, String languageCode) {
         if (claim == null) {
             throw new SOLAException(ServiceMessage.GENERAL_OBJECT_IS_NULL);
@@ -226,7 +259,6 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
                     }
                 }
             }
-            claim.setVersion(claim.getVersion() + 1);
         }
 
         // Save claim
@@ -1838,7 +1870,13 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
             return false;
         }
 
-        // Approve claim moderation
+        // Set registration date and approve claim moderation
+        if(claim.getShares() != null){
+            for(ClaimShare share : claim.getShares()){
+                share.setRegistrationDate(Calendar.getInstance().getTime());
+            }
+        }
+        
         if (changeClaimStatus(id, null, ClaimStatusConstants.MODERATED, null)) {
             List<Claim> challenges = getChallengingClaimsByChallengedId(id);
 
@@ -2028,6 +2066,37 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
         return true;
     }
 
+    @Override
+    public boolean canTransferClaim(String claimId){
+        return canTransferClaim(getRepository().getEntity(Claim.class, claimId), false);
+    }
+    
+    private boolean canTransferClaim(Claim claim, boolean throwException) {
+        if (claim == null) {
+            if (throwException) {
+                throw new SOLAException(ServiceMessage.OT_WS_CLAIM_NOT_FOUND);
+            }
+            return false;
+        }
+
+        // Check user role
+        if (!isInRole(RolesConstants.CS_MODERATE_CLAIM)) {
+            if (throwException) {
+                throw new SOLAException(ServiceMessage.EXCEPTION_INSUFFICIENT_RIGHTS);
+            }
+            return false;
+        }
+
+        // Check claim status
+        if (!claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.MODERATED)) {
+            if (throwException) {
+                throw new SOLAException(ServiceMessage.OT_WS_CLAIM_CANT_TRANSFER);
+            }
+            return false;
+        }
+        return true;
+    }
+    
     @Override
     @RolesAllowed({RolesConstants.CS_MODERATE_CLAIM, RolesConstants.CS_REVIEW_CLAIM})
     public boolean assignClaim(String claimId) {
@@ -2272,6 +2341,7 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
         permissions.setCanRevert(canRevertClaimReview(claim, false));
         permissions.setCanPrintCertificate(canPrintClaimCertificate(claim, false));
         permissions.setCanIssue(canIssueClaim(claim, false));
+        permissions.setCanTransfer(canTransferClaim(claim, false));
         return permissions;
     }
 

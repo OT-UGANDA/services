@@ -1,14 +1,21 @@
 package org.sola.cs.services.ejbs.claim.entities;
 
+import java.util.Date;
 import java.util.List;
 import javax.persistence.Column;
 import javax.persistence.Id;
+import javax.persistence.OrderBy;
+import javax.persistence.OrderColumn;
 import javax.persistence.Table;
 import org.sola.services.common.repository.ChildEntityList;
+import org.sola.services.common.repository.DefaultSorter;
 import org.sola.services.common.repository.entities.AbstractVersionedEntity;
 
 @Table(schema = "opentenure", name = "claim_share")
+@DefaultSorter(sortString = "status, registration_date")
 public class ClaimShare extends AbstractVersionedEntity {
+    public static final String STATUS_ACTIVE = "a";
+    public static final String STATUS_HISTORIC = "h";
     
     @Id
     @Column(name = "id")
@@ -24,6 +31,12 @@ public class ClaimShare extends AbstractVersionedEntity {
     @ChildEntityList(parentIdField = "claimShareId", childIdField = "partyId",
     manyToManyClass = ClaimPartyForShare.class)
     private List<ClaimParty> owners;
+    @Column
+    private String status;
+    @Column(name = "registration_date")
+    private Date registrationDate;
+    @Column(name = "termination_date")
+    private Date terminationDate;
     
     public ClaimShare(){
         super();
@@ -75,5 +88,29 @@ public class ClaimShare extends AbstractVersionedEntity {
 
     public void setOwners(List<ClaimParty> owners) {
         this.owners = owners;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public Date getRegistrationDate() {
+        return registrationDate;
+    }
+
+    public void setRegistrationDate(Date registrationDate) {
+        this.registrationDate = registrationDate;
+    }
+
+    public Date getTerminationDate() {
+        return terminationDate;
+    }
+
+    public void setTerminationDate(Date terminationDate) {
+        this.terminationDate = terminationDate;
     }
 }

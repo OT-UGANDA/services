@@ -60,6 +60,7 @@ public interface ClaimEJBLocal extends AbstractEJBLocal {
     boolean submitClaim(String claimId, String languageCode);
     boolean canPrintClaimCertificate(String claimId, String languageCode);
     boolean canIssueClaim(String id);
+    boolean canTransferClaim(String claimId);
     void addClaimAttachment(String claimId, String attachmentId);
     Attachment saveClaimAttachment(Attachment attachment, String languageCode);
     ClaimPermissions getClaimPermissions(String claimId);
@@ -72,4 +73,5 @@ public interface ClaimEJBLocal extends AbstractEJBLocal {
     boolean checkFormTemplateHasPayload(String formName);
     boolean issueClaim(String claimId, String langaugeCode);
     List<SourceType> getDocumentTypesForIssuance(String langaugeCode);
+    Claim transferClaim(Claim claim, String languageCode);
 }
