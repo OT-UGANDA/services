@@ -15,6 +15,7 @@ import org.sola.cs.services.ejbs.claim.entities.FieldValueType;
 import org.sola.cs.services.ejbs.claim.entities.FormTemplate;
 import org.sola.cs.services.ejbs.claim.entities.LandUse;
 import org.sola.cs.services.ejbs.claim.entities.RejectionReason;
+import org.sola.cs.services.ejbs.claim.entities.Restriction;
 import org.sola.services.common.ejbs.AbstractEJBLocal;
 
 @Local
@@ -74,4 +75,6 @@ public interface ClaimEJBLocal extends AbstractEJBLocal {
     boolean issueClaim(String claimId, String langaugeCode);
     List<SourceType> getDocumentTypesForIssuance(String langaugeCode);
     Claim transferClaim(Claim claim, String languageCode);
+    Claim registerMortgage(Claim claim, String languageCode);
+    Restriction terminateRestriction(String restrictionId);
 }

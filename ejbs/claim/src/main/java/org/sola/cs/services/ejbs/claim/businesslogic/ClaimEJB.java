@@ -58,6 +58,7 @@ import org.sola.services.common.repository.CommonSqlProvider;
 import org.sola.cs.services.ejb.system.businesslogic.SystemCSEJBLocal;
 import org.sola.cs.services.ejbs.admin.businesslogic.AdminCSEJBLocal;
 import org.sola.cs.services.ejbs.admin.businesslogic.repository.entities.User;
+import org.sola.cs.services.ejbs.claim.entities.Restriction;
 
 /**
  * Implements methods to manage the claim and it's related objects
@@ -157,30 +158,73 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
         claim.setVersion(claim.getVersion() + 1);
         Date currentTime = Calendar.getInstance().getTime();
         String userName = getUserName();
-        
+
         // Set share registration and termination date
-        if(claim.getShares() != null){
-            for(ClaimShare share : claim.getShares()){
+        if (claim.getShares() != null) {
+            for (ClaimShare share : claim.getShares()) {
                 // Assign user name if empty
-                if(share.getOwners() != null){
-                    for(ClaimParty party : share.getOwners()){
-                        if(StringUtility.isEmpty(party.getUserName())){
+                if (share.getOwners() != null) {
+                    for (ClaimParty party : share.getOwners()) {
+                        if (StringUtility.isEmpty(party.getUserName())) {
                             party.setUserName(userName);
                         }
                     }
                 }
-                
-                if(StringUtility.empty(share.getStatus()).equalsIgnoreCase(ClaimShare.STATUS_HISTORIC) && share.getTerminationDate() == null)
+
+                if (StringUtility.empty(share.getStatus()).equalsIgnoreCase(ClaimShare.STATUS_HISTORIC) && share.getTerminationDate() == null) {
                     share.setTerminationDate(currentTime);
-                if((StringUtility.isEmpty(share.getStatus())  
+                }
+                if ((StringUtility.isEmpty(share.getStatus())
                         || StringUtility.empty(share.getStatus()).equalsIgnoreCase(ClaimShare.STATUS_ACTIVE))
-                        && share.getRegistrationDate()== null)
+                        && share.getRegistrationDate() == null) {
                     share.setRegistrationDate(currentTime);
+                }
             }
         }
         return getRepository().saveEntity(claim);
     }
-    
+
+    @Override
+    @RolesAllowed({RolesConstants.CS_RECORD_CLAIM, RolesConstants.CS_REVIEW_CLAIM, RolesConstants.CS_MODERATE_CLAIM})
+    public Claim registerMortgage(Claim claim, String languageCode) {
+        if (claim == null) {
+            throw new SOLAException(ServiceMessage.GENERAL_OBJECT_IS_NULL);
+        }
+        
+        String userName = getUserName();
+        
+        if (claim.getRestrictions() != null) {
+            for (Restriction restriction : claim.getRestrictions()) {
+                if (restriction.getRestrictingParties() != null) {
+                    for (ClaimParty party : restriction.getRestrictingParties()) {
+                        if (StringUtility.isEmpty(party.getUserName())) {
+                            party.setUserName(userName);
+                        }
+                    }
+                }
+            }
+        }
+
+        claim.setVersion(claim.getVersion() + 1);
+        return getRepository().saveEntity(claim);
+    }
+
+    @Override
+    @RolesAllowed({RolesConstants.CS_RECORD_CLAIM, RolesConstants.CS_REVIEW_CLAIM, RolesConstants.CS_MODERATE_CLAIM})
+    public Restriction terminateRestriction(String restrictionId) {
+        if (StringUtility.isEmpty(restrictionId)) {
+            return null;
+        }
+        Restriction restriction = getRepository().getEntity(Restriction.class, restrictionId);
+        if (restriction == null || !StringUtility.empty(restriction.getStatus()).equalsIgnoreCase(Restriction.STATUS_ACTIVE)) {
+            return null;
+        }
+        restriction.setStatus(Restriction.STATUS_HISTORIC);
+        restriction.setTerminationDate(Calendar.getInstance().getTime());
+        getRepository().saveEntity(restriction);
+        return getRepository().getEntity(Restriction.class, restrictionId);
+    }
+
     @Override
     @RolesAllowed({RolesConstants.CS_RECORD_CLAIM, RolesConstants.CS_REVIEW_CLAIM, RolesConstants.CS_MODERATE_CLAIM})
     public Claim saveClaim(Claim claim, String languageCode) {
@@ -1871,12 +1915,12 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
         }
 
         // Set registration date and approve claim moderation
-        if(claim.getShares() != null){
-            for(ClaimShare share : claim.getShares()){
+        if (claim.getShares() != null) {
+            for (ClaimShare share : claim.getShares()) {
                 share.setRegistrationDate(Calendar.getInstance().getTime());
             }
         }
-        
+
         if (changeClaimStatus(id, null, ClaimStatusConstants.MODERATED, null)) {
             List<Claim> challenges = getChallengingClaimsByChallengedId(id);
 
@@ -2067,10 +2111,10 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
     }
 
     @Override
-    public boolean canTransferClaim(String claimId){
+    public boolean canTransferClaim(String claimId) {
         return canTransferClaim(getRepository().getEntity(Claim.class, claimId), false);
     }
-    
+
     private boolean canTransferClaim(Claim claim, boolean throwException) {
         if (claim == null) {
             if (throwException) {
@@ -2096,7 +2140,7 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
         }
         return true;
     }
-    
+
     @Override
     @RolesAllowed({RolesConstants.CS_MODERATE_CLAIM, RolesConstants.CS_REVIEW_CLAIM})
     public boolean assignClaim(String claimId) {
@@ -2187,10 +2231,10 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
         }
 
         // Check claim status and ownership
-        if(canIssueClaim(claim, throwException)){
+        if (canIssueClaim(claim, throwException)) {
             return true;
         }
-        
+
         if (!claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.UNMODERATED)
                 || !StringUtility.empty(claim.getRecorderName()).equalsIgnoreCase(getUserName())) {
             if (throwException) {
@@ -2285,8 +2329,8 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
         Attachment attch = getRepository().getEntity(Attachment.class, attachmentId);
         if (attch == null) {
             throw new SOLAException(ServiceMessage.OT_WS_MISSING_SERVER_ATTACHMENTS);
-        } else {
-            // Check user name on attachment
+        } else // Check user name on attachment
+        {
             if (!isInRole(RolesConstants.CS_REVIEW_CLAIM, RolesConstants.CS_MODERATE_CLAIM, RolesConstants.CS_PRINT_CERTIFICATE)
                     && !attch.getUserName().equalsIgnoreCase(getUserName())) {
                 throw new SOLAException(ServiceMessage.EXCEPTION_OBJECT_ACCESS_RIGHTS);
@@ -2307,11 +2351,11 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
 
     @Override
     @RolesAllowed({RolesConstants.CS_MODERATE_CLAIM, RolesConstants.CS_PRINT_CERTIFICATE})
-    public Attachment saveClaimAttachment(Attachment attachment, String languageCode){
+    public Attachment saveClaimAttachment(Attachment attachment, String languageCode) {
         // TODO: Make additional checks to allow saving only for moderated claims
         return getRepository().saveEntity(attachment);
     }
-    
+
     @Override
     @RolesAllowed({RolesConstants.CS_ACCESS_CS})
     public ClaimPermissions getClaimPermissions(String claimId) {

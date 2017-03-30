@@ -57,6 +57,8 @@ public class Claim extends AbstractVersionedEntity {
     @ChildEntityList(parentIdField = "claimId", cascadeDelete = true)
     private List<ClaimShare> shares;
     @ChildEntityList(parentIdField = "claimId", cascadeDelete = true)
+    private List<Restriction> restrictions;
+    @ChildEntityList(parentIdField = "claimId", cascadeDelete = true)
     private List<ClaimLocation> locations;
     @ChildEntityList(parentIdField = "claimId", cascadeDelete = true)
     private List<ClaimComment> comments;
@@ -178,6 +180,14 @@ public class Claim extends AbstractVersionedEntity {
 
     public void setShares(List<ClaimShare> shares) {
         this.shares = shares;
+    }
+
+    public List<Restriction> getRestrictions() {
+        return restrictions;
+    }
+
+    public void setRestrictions(List<Restriction> restrictions) {
+        this.restrictions = restrictions;
     }
 
     public List<Attachment> getAttachments() {
