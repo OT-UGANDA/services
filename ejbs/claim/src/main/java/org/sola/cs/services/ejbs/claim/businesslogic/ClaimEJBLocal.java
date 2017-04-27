@@ -77,4 +77,6 @@ public interface ClaimEJBLocal extends AbstractEJBLocal {
     Claim transferClaim(Claim claim, String languageCode);
     Claim registerMortgage(Claim claim, String languageCode);
     Restriction terminateRestriction(String restrictionId);
+    void mergeClaims(List<Claim> oldClaims, Claim newClaim);
+    void splitClaim(Claim oldClaim, List<Claim> newClaims);
 }

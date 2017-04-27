@@ -34,6 +34,18 @@ public class ClaimStatusChanger extends AbstractEntity {
     @Column(name="issuance_date")
     private Date issuanceDate;
     
+    @Column(name = "termination_date")
+    private Date terminationDate;
+    
+    @Column(name = "termination_reason_code")
+    private String terminationReasonCode;
+    
+    @Column(name = "create_transaction")
+    private String createTransaction;
+    
+    @Column(name = "terminate_transaction")
+    private String terminateTransaction;
+    
     public ClaimStatusChanger() {
         super();
     }
@@ -100,5 +112,37 @@ public class ClaimStatusChanger extends AbstractEntity {
 
     public void setIssuanceDate(Date issuanceDate) {
         this.issuanceDate = issuanceDate;
+    }
+
+    public Date getTerminationDate() {
+        return terminationDate;
+    }
+
+    public void setTerminationDate(Date terminationDate) {
+        this.terminationDate = terminationDate;
+    }
+
+    public String getTerminationReasonCode() {
+        return terminationReasonCode;
+    }
+
+    public void setTerminationReasonCode(String terminationReasonCode) {
+        this.terminationReasonCode = terminationReasonCode;
+    }
+
+    public String getCreateTransaction() {
+        return createTransaction;
+    }
+
+    public void setCreateTransaction(String createTransaction) {
+        this.createTransaction = createTransaction;
+    }
+
+    public String getTerminateTransaction() {
+        return terminateTransaction;
+    }
+
+    public void setTerminateTransaction(String terminateTransaction) {
+        this.terminateTransaction = terminateTransaction;
     }
 }

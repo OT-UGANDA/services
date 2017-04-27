@@ -59,6 +59,7 @@ import org.sola.cs.services.ejb.system.businesslogic.SystemCSEJBLocal;
 import org.sola.cs.services.ejbs.admin.businesslogic.AdminCSEJBLocal;
 import org.sola.cs.services.ejbs.admin.businesslogic.repository.entities.User;
 import org.sola.cs.services.ejbs.claim.entities.Restriction;
+import org.sola.cs.services.ejbs.claim.entities.TerminationReason;
 
 /**
  * Implements methods to manage the claim and it's related objects
@@ -130,6 +131,21 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
         Claim result = null;
         if (id != null) {
             result = getRepository().getEntity(Claim.class, id);
+            // Populate parent and child lists
+            if (result != null && !StringUtility.isEmpty(result.getCreateTransaction())) {
+                // Get parents
+                HashMap params = new HashMap();
+                params.put(CommonSqlProvider.PARAM_WHERE_PART, Claim.WHERE_BY_TERMINTATE_TRANSACTION);
+                params.put(Claim.PARAM_TRANSACTION, result.getCreateTransaction());
+                result.setParentClaims(getRepository().getEntityList(Claim.class, params));
+            }
+            if (result != null && !StringUtility.isEmpty(result.getTerminateTransaction())) {
+                // Get children
+                HashMap params = new HashMap();
+                params.put(CommonSqlProvider.PARAM_WHERE_PART, Claim.WHERE_BY_CREATE_TRANSACTION);
+                params.put(Claim.PARAM_TRANSACTION, result.getTerminateTransaction());
+                result.setChildClaims(getRepository().getEntityList(Claim.class, params));
+            }
         }
         return result;
     }
@@ -190,9 +206,9 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
         if (claim == null) {
             throw new SOLAException(ServiceMessage.GENERAL_OBJECT_IS_NULL);
         }
-        
+
         String userName = getUserName();
-        
+
         if (claim.getRestrictions() != null) {
             for (Restriction restriction : claim.getRestrictions()) {
                 if (restriction.getRestrictingParties() != null) {
@@ -223,6 +239,98 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
         restriction.setTerminationDate(Calendar.getInstance().getTime());
         getRepository().saveEntity(restriction);
         return getRepository().getEntity(Restriction.class, restrictionId);
+    }
+
+    @Override
+    @RolesAllowed({RolesConstants.CS_MODERATE_CLAIM})
+    public void mergeClaims(List<Claim> oldClaims, Claim newClaim) {
+        if (oldClaims == null || oldClaims.size() < 1 || newClaim == null) {
+            throw new SOLAException(ServiceMessage.OT_WS_CLAIM_NOT_FOUND);
+        }
+
+        // Make checks
+        checkClaimToAdd(newClaim);
+        if (oldClaims.size() < 2) {
+            throw new SOLAException(ServiceMessage.OT_WS_CLAIM_MERGE_WRONG_COUNT);
+        }
+
+        Date today = Calendar.getInstance().getTime();
+        String transactionId = UUID.randomUUID().toString();
+
+        // Update new claim to set creations transaction
+        ClaimStatusChanger claimChanger = getRepository().getEntity(ClaimStatusChanger.class, newClaim.getId());
+        if (claimChanger != null) {
+            claimChanger.setCreateTransaction(transactionId);
+            getRepository().saveEntity(claimChanger);
+        }
+
+        // Make historic old claims
+        for (Claim claim : oldClaims) {
+            checkClaimToAdd(claim);
+            claimChanger = getRepository().getEntity(ClaimStatusChanger.class, claim.getId());
+            if (claimChanger != null) {
+                claimChanger.setTerminationDate(today);
+                claimChanger.setTerminateTransaction(transactionId);
+                claimChanger.setTerminationReasonCode(TerminationReason.CODE_MERGE);
+                claimChanger.setAssigneeName(null);
+                claimChanger.setStatusCode(ClaimStatusConstants.HISTORIC);
+                getRepository().saveEntity(claimChanger);
+            }
+        }
+    }
+
+    @Override
+    @RolesAllowed({RolesConstants.CS_MODERATE_CLAIM})
+    public void splitClaim(Claim oldClaim, List<Claim> newClaims) {
+        if (newClaims == null || newClaims.size() < 1 || oldClaim == null) {
+            throw new SOLAException(ServiceMessage.OT_WS_CLAIM_NOT_FOUND);
+        }
+
+        // Make checks
+        checkClaimToAdd(oldClaim);
+        if (newClaims.size() < 2) {
+            throw new SOLAException(ServiceMessage.OT_WS_CLAIM_SPLIT_WRONG_COUNT);
+        }
+
+        Date today = Calendar.getInstance().getTime();
+        String transactionId = UUID.randomUUID().toString();
+
+        // Make historic old claim
+        ClaimStatusChanger claimChanger = getRepository().getEntity(ClaimStatusChanger.class, oldClaim.getId());
+        if (claimChanger != null) {
+            claimChanger.setTerminationDate(today);
+            claimChanger.setTerminateTransaction(transactionId);
+            claimChanger.setTerminationReasonCode(TerminationReason.CODE_SPLIT);
+            claimChanger.setAssigneeName(null);
+            claimChanger.setStatusCode(ClaimStatusConstants.HISTORIC);
+            getRepository().saveEntity(claimChanger);
+        }
+
+        // Update new claims to set creations transaction
+        for (Claim claim : newClaims) {
+            checkClaimToAdd(claim);
+            claimChanger = getRepository().getEntity(ClaimStatusChanger.class, claim.getId());
+            if (claimChanger != null) {
+                claimChanger.setCreateTransaction(transactionId);
+                getRepository().saveEntity(claimChanger);
+            }
+        }
+    }
+
+    private boolean checkClaimToAdd(Claim claim) {
+        // Check status 
+        if (!claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.MODERATED)) {
+            throw new SOLAException(ServiceMessage.OT_WS_CLAIM_MUST_BE_MODERATED, new Object[]{claim.getNr()});
+        }
+        // Check restrictions
+        if (claim.getRestrictions() != null) {
+            for (Restriction restriction : claim.getRestrictions()) {
+                if (restriction.getStatus().equalsIgnoreCase("a")) {
+                    throw new SOLAException(ServiceMessage.OT_WS_CLAIM_HAS_RESTRICTIONS, new Object[]{claim.getNr()});
+                }
+            }
+        }
+        return true;
     }
 
     @Override
@@ -1672,7 +1780,8 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
         if (claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.MODERATED)
                 || claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.ISSUED)
                 || claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.REJECTED)
-                || claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.WITHDRAWN)) {
+                || claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.WITHDRAWN)
+                || claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.HISTORIC)) {
             if (throwException) {
                 throw new SOLAException(ServiceMessage.OT_WS_CLAIM_IS_READ_ONLY);
             }
@@ -2207,6 +2316,7 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
                 || claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.CREATED)
                 || claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.WITHDRAWN)
                 || claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.MODERATED)
+                || claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.HISTORIC)
                 || claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.ISSUED)
                 || !StringUtility.isEmpty(claim.getAssigneeName())) {
             if (throwException) {
@@ -2226,6 +2336,14 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
         if (claim == null) {
             if (throwException) {
                 throw new SOLAException(ServiceMessage.OT_WS_CLAIM_NOT_FOUND);
+            }
+            return false;
+        }
+
+        // Forbid adding documents for historic claims
+        if (claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.HISTORIC)) {
+            if (throwException) {
+                throw new SOLAException(ServiceMessage.OT_WS_CLAIM_IS_READ_ONLY);
             }
             return false;
         }
@@ -2269,6 +2387,7 @@ public class ClaimEJB extends AbstractEJB implements ClaimEJBLocal {
         // Check claim can be assigned
         if (!isClaimExpired(claim) || claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.REJECTED)
                 || claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.WITHDRAWN)
+                || claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.HISTORIC)
                 || claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.MODERATED)
                 || claim.getStatusCode().equalsIgnoreCase(ClaimStatusConstants.ISSUED)
                 || StringUtility.isEmpty(claim.getAssigneeName())) {
